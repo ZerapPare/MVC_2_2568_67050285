@@ -27,3 +27,6 @@ file:///path/to/views/index.html
 ### 5. ดาวน์โหลด CSV
 - ไปหน้า Index
 - กด "Export [filename].csv"
+
+## ฐานข้อมูล
+- localStorage (Browser Storage) ใน app.js และ fs.js
