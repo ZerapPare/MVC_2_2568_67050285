@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Shelters</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="nav__inner">
+      <a class="brand" href="index.html"><span class="brand__dot"></span> MVC</a>
+      <nav class="nav__links">
+        <a class="pill" data-nav href="citizens.html">ประชาชน</a>
+        <a class="pill" data-nav href="shelters.html">ที่พักพิง</a>
+        <a class="pill" data-nav href="report.html">รายงาน</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="header">
+      <div>
+        <h1 class="h1">จัดการที่พักพิง</h1>
+        <p class="sub">เพิ่มศูนย์พักพิง + ดูรายการทั้งหมด + จัดการความเสี่ยง</p>
+      </div>
+      <span id="toast" class="badge" style="display:none"></span>
+    </div>
+
+    <div class="grid cols-2">
+      <section class="card">
+        <h2>เพิ่มศูนย์พักพิง</h2>
+
+        <div class="row">
+          <div>
+            <label>รหัสศูนย์พักพิง (shelterId)</label>
+            <input id="shelterId" placeholder="เช่น S006" />
+          </div>
+          <div>
+            <label>ชื่อศูนย์พักพิง</label>
+            <input id="name" placeholder="ชื่อสถานที่" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>ความจุ (คน)</label>
+            <input id="capacity" type="number" min="1" placeholder="เช่น 10" />
+          </div>
+          <div>
+            <label>ระดับความเสี่ยง</label>
+            <select id="riskLevel">
+              <option value=""></option>
+              <option value="Low">ต่ำ (Low)</option>
+              <option value="Medium">กลาง (Medium)</option>
+              <option value="High">สูง (High)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="btnAdd">บันทึก</button>
+          <button class="btn" id="btnExport">Export shelters.csv</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>ตัวกรอง</h2>
+        <div class="row">
+          <div>
+            <label>ค้นหา (รหัส/ชื่อ)</label>
+            <input id="q" placeholder="พิมพ์เพื่อค้นหา..." />
+          </div>
+          <div>
+            <label>ระดับความเสี่ยง</label>
+            <select id="filterRisk">
+              <option value="">ทั้งหมด</option>
+              <option value="Low">ต่ำ (Low)</option>
+              <option value="Medium">กลาง (Medium)</option>
+              <option value="High">สูง (High)</option>
+            </select>
+          </div>
+        </div>
+        <div class="hr"></div>
+        <p class="small muted">ศูนย์พักพิง >= 5 แห่ง สำหรับการบริหารจัดการ 30 ประชาชน</p>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:14px">
+      <h2>ศูนย์พักพิงทั้งหมด</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>shelterId</th>
+            <th>ชื่อ</th>
+            <th>ความจุ</th>
+            <th>ผู้เข้าพักอยู่</th>
+            <th>ว่าง</th>
+            <th>ความเสี่ยง</th>
+            <th>กรรมการ</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="../src/app.js"></script>
+  <script>
+    EVAC.Controller.init();
+    EVAC.setActiveNav();
+
+    function render(){
+      const q = document.getElementById("q").value.trim().toLowerCase();
+      const fr = document.getElementById("filterRisk").value;
+
+      const rows = EVAC.DB.shelters
+        .filter(s => {
+          if (fr && s.riskLevel !== fr) return false;
+          if (!q) return true;
+          return (s.shelterId || "").toLowerCase().includes(q) ||
+                 (s.name || "").toLowerCase().includes(q);
+        })
+        .map(s => {
+          const occupancy = EVAC.getShelterOccupancy(s.shelterId);
+          const capacity = Number(s.capacity || 0);
+          const available = capacity - occupancy;
+          return {
+            shelterId: s.shelterId,
+            name: s.name,
+            capacity,
+            occupancy,
+            available,
+            riskLevel: s.riskLevel
+          };
+        });
+
+      const tb = document.getElementById("tbody");
+      tb.innerHTML = rows.map(r => `
+        <tr>
+          <td>${r.shelterId}</td>
+          <td>${r.name}</td>
+          <td>${r.capacity}</td>
+          <td>${r.occupancy}</td>
+          <td><span class="badge ${r.available <= 0 ? "danger" : r.available <= 2 ? "warn" : "ok"}"><b>${r.available}</b></span></td>
+          <td>${r.riskLevel}</td>
+          <td>
+            <button class="btn" onclick="showShelterCitizens('${r.shelterId}', '${r.name}')">รายชื่อ</button>
+            <button class="btn danger" onclick="deleteShelterHandler('${r.shelterId}')">ลบ</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    document.getElementById("btnAdd").addEventListener("click", () => {
+      const payload = {
+        shelterId: document.getElementById("shelterId").value,
+        name: document.getElementById("name").value,
+        capacity: document.getElementById("capacity").value,
+        riskLevel: document.getElementById("riskLevel").value
+      };
+      const res = EVAC.Controller.addShelter(payload);
+      if (!res.ok) return EVAC.toast(res.msg, "danger");
+
+      EVAC.toast("เพิ่มศูนย์พักพิงสำเร็จ", "ok");
+      document.getElementById("shelterId").value = "";
+      document.getElementById("name").value = "";
+      document.getElementById("capacity").value = "";
+      document.getElementById("riskLevel").value = "";
+      render();
+    });
+
+    document.getElementById("btnExport").addEventListener("click", () => {
+      EVAC.downloadText("shelters.csv", EVAC.Controller.exportCSV("shelters"));
+    });
+
+    document.getElementById("q").addEventListener("input", render);
+    document.getElementById("filterRisk").addEventListener("change", render);
+
+    window.deleteShelterHandler = function(shelterId){
+      if (!confirm(`ยืนยันต้องการลบ ${shelterId} หรือไม่?`)) return;
+      
+      const res = EVAC.Controller.deleteShelter(shelterId);
+      if (!res.ok) return EVAC.toast(res.msg, "danger");
+      
+      EVAC.toast("ลบศูนย์พักพิงสำเร็จ", "ok");
+      render();
+    };
+
+    // Show citizens in shelter
+    window.showShelterCitizens = function(shelterId, shelterName){
+      const citizens = EVAC.DB.citizens.filter(c => {
+        const assignedShelter = EVAC.getAssignedShelterId(c.citizenId);
+        return assignedShelter === shelterId;
+      });
+
+      let html = `<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999" id="shelterModal">`;
+      html += `<div style="background:#1a1f3a;padding:20px;border-radius:8px;max-width:500px;width:90%">`;
+      html += `<h3 style="color:#fff;margin-top:0">${shelterName} - ${citizens.length} คน</h3>`;
+      html += `<div style="max-height:400px;overflow-y:auto">`;
+      
+      if (citizens.length === 0){
+        html += `<p style="color:#aaa">ไม่มีประชาชนเข้าที่พัก</p>`;
+      } else {
+        citizens.forEach(c => {
+          html += `<div style="background:#252d4a;padding:10px;margin-bottom:8px;border-radius:4px;display:flex;justify-content:space-between;align-items:center">`;
+          html += `<div><strong style="color:#fff">${c.citizenId}</strong><br/><span style="color:#aaa">${c.name} (${c.age} ปี)</span></div>`;
+          html += `<button class="btn danger" onclick="unassignFromShelter('${c.citizenId}')" style="font-size:12px;padding:4px 8px">ยกเลิก</button>`;
+          html += `</div>`;
+        });
+      }
+      
+      html += `</div>`;
+      html += `<button class="btn" onclick="document.getElementById('shelterModal').remove()" style="margin-top:15px">ปิด</button>`;
+      html += `</div></div>`;
+      
+      document.body.insertAdjacentHTML('beforeend', html);
+    };
+
+    window.unassignFromShelter = function(citizenId){
+      if (!confirm(`ยืนยันต้องการยกเลิกที่พักสำหรับ ${citizenId} หรือไม่?`)) return;
+      
+      EVAC.Controller.unassignCitizen(citizenId);
+      EVAC.toast("ยกเลิกที่พักสำเร็จ", "ok");
+      document.getElementById("shelterModal").remove();
+      render();
+    };
+
+    render();
+  </script>
+</body>
+</html>

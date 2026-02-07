@@ -1,0 +1,6 @@
+shelterId,name,capacity,riskLevel
+S001,ศูนย์กีฬาเขต 1,6,Low
+S002,โรงเรียนเทศบาล 2,5,Medium
+S003,วัดกลาง,7,Low
+S004,ศูนย์การศึกษาจังหวัด,5,Low
+S005,โรงแรมพักอาศัย,8,Medium

@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MVC</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="nav__inner">
+      <a class="brand" href="index.html">
+        <span class="brand__dot"></span>
+        MVC
+      </a>
+      <nav class="nav__links">
+        <a class="pill" data-nav href="citizens.html">ประชาชน</a>
+        <a class="pill" data-nav href="shelters.html">ที่พักพิง</a>
+        <a class="pill" data-nav href="report.html">รายงาน</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="header">
+      <div>
+        <h1 class="h1">ศูนย์จัดการอพยพ (เก็บเป็น CSV)</h1>
+        <p class="sub">
+          ได้ 3 ไฟล์:
+          <span class="kbd">citizens.csv</span>,
+          <span class="kbd">shelters.csv</span>,
+          <span class="kbd">assignments.csv</span>
+          — Import/Export ได้ และถ้าผูกไฟล์ไว้จะ Auto Save ให้ด้วย
+        </p>
+      </div>
+      <span id="toast" class="badge" style="display:none"></span>
+    </div>
+
+    <div class="grid cols-2">
+      <!-- ===== LEFT: Import ===== -->
+      <section class="card">
+        <h2>Import CSV (อัปโหลด)</h2>
+        <p class="muted small">
+          ใช้สำหรับ "นำเข้า" CSV แบบเลือกไฟล์อัปโหลด 
+        </p>
+
+        <div class="row">
+          <div>
+            <label>ชนิดข้อมูล</label>
+            <select id="importKind">
+              <option value="citizens">citizens.csv</option>
+              <option value="shelters">shelters.csv</option>
+              <option value="assignments">assignments.csv</option>
+            </select>
+          </div>
+          <div>
+            <label>เลือกไฟล์</label>
+            <input id="importFile" type="file" accept=".csv,text/csv" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="btnImport">Import</button>
+          <button class="btn danger" id="btnReset">Reset เป็นค่าเริ่มต้น</button>
+        </div>
+
+        <div class="hr"></div>
+
+        <h2>ผูกไฟล์ CSV จริง (Auto Save - Chrome/Edge)</h2>
+        <p class="muted small">
+          โหมดนี้จะเขียนทับไฟล์ CSV จริงบนเครื่องได้ (ต้องเปิดผ่าน <span class="kbd">localhost</span>)
+          และต้องใช้ Chrome/Edge เท่านั้น
+        </p>
+
+        <div class="row">
+          <button class="btn" id="pickCit">Choose citizens.csv</button>
+          <button class="btn" id="pickShe">Choose shelters.csv</button>
+          <button class="btn" id="pickAsg">Choose assignments.csv</button>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="loadAll">Load จากไฟล์ที่เลือก</button>
+          <button class="btn ok" id="saveAll">Save ทั้งหมดลงไฟล์ที่เลือก</button>
+        </div>
+
+        <div class="hr"></div>
+
+        <h2>Header CSV</h2>
+        <p class="small muted">
+          - citizens: <span class="kbd">citizenId,name,age,healthStatus,registerDate,citizenType</span>
+          <br>- shelters: <span class="kbd">shelterId,name,capacity,riskLevel</span>
+          <br>- assignments: <span class="kbd">citizenId,shelterId,checkInDate</span>
+        </p>
+      </section>
+
+      <!-- ===== RIGHT: Export ===== -->
+      <section class="card">
+        <h2>Export CSV (ดาวน์โหลด)</h2>
+        <p class="muted small">
+          ดาวน์โหลด CSV ออกไปเก็บเป็นไฟล์ (วิธีพื้นฐาน ใช้ได้ทุกบราวเซอร์)
+        </p>
+
+        <div class="row">
+          <button class="btn" id="expCit">Export citizens.csv</button>
+          <button class="btn" id="expShe">Export shelters.csv</button>
+          <button class="btn" id="expAsg">Export assignments.csv</button>
+        </div>
+
+        <div class="hr"></div>
+
+        <h2>Details</h2>
+        <p class="muted small">เลือกหน้า View ที่ต้องการ</p>
+        <div class="row">
+          <a class="btn primary" href="citizens.html">ไปหน้าประชาชน</a>
+          <a class="btn primary" href="shelters.html">ไปหน้าที่พักพิง</a>
+          <a class="btn primary" href="report.html">ไปหน้ารายงาน</a>
+        </div>
+
+        <div class="hr"></div>
+
+        <h2>สถานะโหมด Auto Save</h2>
+        <p class="small muted" id="fsStatus">ยังไม่ตรวจสอบ</p>
+        <p class="small muted">
+          ถ้ากด Choose แล้ว Auto Save จะทำงานเมื่อมีการแก้ข้อมูลในหน้าอื่นๆ
+        </p>
+      </section>
+    </div>
+  </main>
+
+  <script src="../src/fs.js"></script>
+  <script src="../src/app.js"></script>
+
+  <script>
+    EVAC.Controller.init();
+    EVAC.setActiveNav();
+
+    // ---------- Helpers ----------
+    function updateFsStatus(){
+      const el = document.getElementById("fsStatus");
+      const ok = !!window.showOpenFilePicker && !!window.EVAC_FS;
+
+      if (!ok){
+        el.innerHTML = `เบราว์เซอร์นี้ไม่รองรับ File System Access API → ใช้ Import/Export แบบดาวน์โหลดแทน`;
+        return;
+      }
+
+      const h = EVAC_FS.FileStore.handles;
+      const c = h.citizens ? "✅" : "❌";
+      const s = h.shelters ? "✅" : "❌";
+      const a = h.assignments ? "✅" : "❌";
+
+      el.innerHTML = `
+        รองรับ API แล้ว | ผูกไฟล์:
+        citizens ${c} / shelters ${s} / assignments ${a}
+      `;
+    }
+
+    // restore handles (ถ้าเคย Choose ไว้)
+    (async () => {
+      try{
+        await EVAC_FS.FileStore.restoreHandles();
+      }catch(e){
+      }
+      updateFsStatus();
+    })();
+
+    // ---------- Import (upload) ----------
+    document.getElementById("btnImport").addEventListener("click", async () => {
+      const kind = document.getElementById("importKind").value;
+      const file = document.getElementById("importFile").files[0];
+      if (!file) return EVAC.toast("กรุณาเลือกไฟล์ก่อน", "warn");
+
+      const text = await EVAC.fileToText(file);
+      const res = EVAC.Controller.importCSV(kind, text);
+      if (!res.ok) return EVAC.toast(res.msg, "danger");
+
+      EVAC.toast("นำเข้าข้อมูลสำเร็จ", "ok");
+    });
+
+    document.getElementById("btnReset").addEventListener("click", () => {
+      EVAC.Controller.resetAll();
+      EVAC.toast("รีเซ็ตข้อมูลสำเร็จ", "ok");
+    });
+
+    // ---------- Export (download) ----------
+    document.getElementById("expCit").addEventListener("click", () => {
+      EVAC.downloadText("citizens.csv", EVAC.Controller.exportCSV("citizens"));
+    });
+    document.getElementById("expShe").addEventListener("click", () => {
+      EVAC.downloadText("shelters.csv", EVAC.Controller.exportCSV("shelters"));
+    });
+    document.getElementById("expAsg").addEventListener("click", () => {
+      EVAC.downloadText("assignments.csv", EVAC.Controller.exportCSV("assignments"));
+    });
+
+    // ---------- Choose file ----------
+    document.getElementById("pickCit").addEventListener("click", async () => {
+      try{
+        await EVAC_FS.FileStore.pickFile("citizens");
+        EVAC.toast("ผูก citizens.csv แล้ว", "ok");
+        updateFsStatus();
+      }catch(e){
+        EVAC.toast("ยกเลิกการเลือกไฟล์", "warn");
+      }
+    });
+
+    document.getElementById("pickShe").addEventListener("click", async () => {
+      try{
+        await EVAC_FS.FileStore.pickFile("shelters");
+        EVAC.toast("ผูก shelters.csv แล้ว", "ok");
+        updateFsStatus();
+      }catch(e){
+        EVAC.toast("ยกเลิกการเลือกไฟล์", "warn");
+      }
+    });
+
+    document.getElementById("pickAsg").addEventListener("click", async () => {
+      try{
+        await EVAC_FS.FileStore.pickFile("assignments");
+        EVAC.toast("ผูก assignments.csv แล้ว", "ok");
+        updateFsStatus();
+      }catch(e){
+        EVAC.toast("ยกเลิกการเลือกไฟล์", "warn");
+      }
+    });
+
+    // ---------- Load from selected files into DB ----------
+    document.getElementById("loadAll").addEventListener("click", async () => {
+      if (!window.EVAC_FS) return EVAC.toast("บราวเซอร์ไม่รองรับคุณลักษณะนี้", "danger");
+
+      const kinds = ["citizens","shelters","assignments"];
+      for (const k of kinds){
+        if (!EVAC_FS.FileStore.handles[k]) continue;
+
+        const r = await EVAC_FS.FileStore.loadFromFile(k);
+        if (!r.ok) return EVAC.toast(r.msg, "danger");
+
+        const res = EVAC.Controller.importCSV(k, r.text);
+        if (!res.ok) return EVAC.toast(res.msg, "danger");
+      }
+      EVAC.toast("โหลดข้อมูลจากไฟล์สำเร็จ", "ok");
+    });
+
+    // ---------- Save current DB into selected files ----------
+    document.getElementById("saveAll").addEventListener("click", async () => {
+      if (!window.EVAC_FS) return EVAC.toast("บราวเซอร์ไม่รองรับคุณลักษณะนี้", "danger");
+
+      const map = ["citizens","shelters","assignments"];
+      for (const k of map){
+        if (!EVAC_FS.FileStore.handles[k]) continue;
+
+        const csv = EVAC.Controller.exportCSV(k);
+        const r = await EVAC_FS.FileStore.saveToFile(k, csv);
+        if (!r.ok) return EVAC.toast(r.msg, "danger");
+      }
+      EVAC.toast("บันทึกข้อมูลลงไฟล์สำเร็จ", "ok");
+    });
+  </script>
+</body>
+</html>

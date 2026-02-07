@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Report</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="nav__inner">
+      <a class="brand" href="index.html"><span class="brand__dot"></span> MVC</a>
+      <nav class="nav__links">
+        <a class="pill" data-nav href="citizens.html">ประชาชน</a>
+        <a class="pill" data-nav href="shelters.html">ที่พักพิง</a>
+        <a class="pill" data-nav href="report.html">รายงาน</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="header">
+      <div>
+        <h1 class="h1">รายงาน</h1>
+        <p class="sub">ดูรายชื่อประชาชนที่ยังไม่ได้รับที่พัก + สรุปการเข้าพัก (Assignments)</p>
+      </div>
+      <span id="toast" class="badge" style="display:none"></span>
+    </div>
+
+    <div class="grid cols-2">
+      <section class="card">
+        <h2>ประชาชนที่ยัง "ไม่ได้ที่พัก"</h2>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>citizenId</th>
+              <th>ชื่อ</th>
+              <th>ประเภท</th>
+              <th>สุขภาพ</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyNoShelter"></tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>สรุป</h2>
+        <div id="summary" class="muted"></div>
+        <div class="hr"></div>
+        <div class="row">
+          <button class="btn" id="expAsg">Export assignments.csv</button>
+          <button class="btn" id="expAll">Export ทั้งหมด 3 ไฟล์</button>
+        </div>
+        <p class="small muted" style="margin-top:10px">ถ้าประชาชนได้รับที่พักทั้งหมด แสดงว่าการจัดการสำเร็จ</p>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:14px">
+      <h2>รายการ Assignments</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>citizen</th>
+            <th>shelter</th>
+            <th>checkInDate</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyAsg"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="../src/app.js"></script>
+  <script>
+    EVAC.Controller.init();
+    EVAC.setActiveNav();
+
+    function render(){
+      const assignedSet = new Set(EVAC.DB.assignments.map(a => a.citizenId));
+      const noShelter = EVAC.DB.citizens.filter(c => !assignedSet.has(c.citizenId));
+
+      document.getElementById("tbodyNoShelter").innerHTML = noShelter.map(c => `
+        <tr>
+          <td>${c.citizenId}</td>
+          <td>${c.name}</td>
+          <td>${c.citizenType}</td>
+          <td>${c.healthStatus}</td>
+        </tr>
+      `).join("");
+
+      document.getElementById("tbodyAsg").innerHTML = EVAC.DB.assignments.map(a => {
+        const c = EVAC.DB.citizens.find(x => x.citizenId === a.citizenId);
+        const s = EVAC.DB.shelters.find(x => x.shelterId === a.shelterId);
+        return `
+          <tr>
+            <td>${a.citizenId}${c ? ` - ${c.name}` : ""}</td>
+            <td>${a.shelterId}${s ? ` - ${s.name}` : ""}</td>
+            <td>${a.checkInDate}</td>
+          </tr>
+        `;
+      }).join("");
+
+      const totalC = EVAC.DB.citizens.length;
+      const totalS = EVAC.DB.shelters.length;
+      const totalA = EVAC.DB.assignments.length;
+
+      const capSum = EVAC.DB.shelters.reduce((sum,s)=> sum + Number(s.capacity||"0"), 0);
+      const occSum = totalA;
+
+      document.getElementById("summary").innerHTML = `
+        <div class="row">
+          <span class="badge">Citizens: <b>${totalC}</b></span>
+          <span class="badge">Shelters: <b>${totalS}</b></span>
+          <span class="badge">Assigned: <b>${totalA}</b></span>
+          <span class="badge ${occSum>=capSum ? "danger" : "ok"}">Capacity: <b>${occSum}/${capSum}</b></span>
+        </div>
+        <div class="hr"></div>
+        <div class="small">
+          ยังไม่ได้ที่พัก: <b>${noShelter.length}</b> คน
+        </div>
+      `;
+    }
+
+    document.getElementById("expAsg").addEventListener("click", () => {
+      EVAC.downloadText("assignments.csv", EVAC.Controller.exportCSV("assignments"));
+    });
+
+    document.getElementById("expAll").addEventListener("click", () => {
+      EVAC.downloadText("citizens.csv", EVAC.Controller.exportCSV("citizens"));
+      EVAC.downloadText("shelters.csv", EVAC.Controller.exportCSV("shelters"));
+      EVAC.downloadText("assignments.csv", EVAC.Controller.exportCSV("assignments"));
+      EVAC.toast("ส่งออกข้อมูลสำเร็จ", "ok");
+    });
+
+    render();
+  </script>
+</body>
+</html>
